@@ -35,38 +35,45 @@ COURSE OBJECT SCHEMA
     }
 */
 
-let config = {
-  method: 'get',
-  maxBodyLength: Infinity,
-  url: 'https://umanitoba-ca-preview.courseleaf.com/undergraduate-studies/course-descriptions/comp/',
-  headers: { }
-};
+async function scrapeCourseData(){
+  let config = {
+    method: 'get',
+    maxBodyLength: Infinity,
+    url: 'https://umanitoba-ca-preview.courseleaf.com/undergraduate-studies/course-descriptions/comp/',
+    headers: { }
+  };
 
-axios.request(config)
-.then((response) => {
-  data = response.data;
-  const $ = cheerio.load(data);
-  $(courseHtmlIdentifier).each((index, element) => {
-    const rawData = $(element).text();
-    const cleanData = cleanCourseText(rawData);
-    const structuredData = extractCourseInfo(rawData);
-    COURSE_DATA.push(structuredData) 
-    RAW_DATA.push(cleanData);
+  axios.request(config)
+  .then((response) => {
+    data = response.data;
+    const $ = cheerio.load(data);
+    $(courseHtmlIdentifier).each((index, element) => {
+      const rawData = $(element).text();
+      const cleanData = cleanCourseText(rawData);
+      const structuredData = extractCourseInfo(rawData);
+      COURSE_DATA.push(structuredData) 
+      RAW_DATA.push(cleanData);
+    });
+    //testEmptyIDs();
+  })
+  .catch((error) => {
+    console.log(error);
   });
-  testDATA();
-})
-.catch((error) => {
-  console.log(error);
-});
+
+  return COURSE_DATA;
+}
 
 function cleanCourseText(text) {
     const cleaningRules = [
       { pattern: /Prerequisite(?:s)?:/i, replacement: "PREREQ:" },
       { pattern: /Pre(?:\s*-\s*)?req(?:uisite)?(?:s)?:/i, replacement: "PREREQ:" },
       { pattern: /Corequisite(?:s)?:/i, replacement: "COREQ:" },
-      { pattern: /Pre- or corequisite(?:s)?:/i, replacement: "PRECOREQ:" },
+      { pattern: /Pre- or corequisite(?:s)?:/i, replacement: "COREQ:" },
       { pattern: /Mutually Exclusive:/i, replacement: "MUTEXCL:" },
       { pattern: /May not be held with/i, replacement: "MUTEXCL:" },
+      { pattern: /concurrent registration:/i, replacement: "MUTEXCL:" },
+      { pattern: /Prerequisite(?:s)?:/i, replacement: "PREREQ:" },
+      { pattern: /Pre(?:\s*-\s*)?req(?:uisite)?(?:s)?:/i, replacement: "PREREQ:" },
       { pattern: /Attributes:/i, replacement: "ATTR:" },
       { pattern: /PR\/CR:/i, replacement: "NOTE:" },
       { pattern: /Equiv(?:alent)? To:/i, replacement: "EQUIV:" }
@@ -78,27 +85,27 @@ function cleanCourseText(text) {
     });
   
     return cleanedText;
-  }
-  
-  
+}
 
 function extractCourseInfo(courseText) {
     const cleanedText = cleanCourseText(courseText);
   
-    const codeAndTitlePattern = /^([A-Z]{4})\s+(\d{4})\s+(.+?)\s+(\d+)\s*cr/;
+    const codeAndTitlePattern = /^([A-Z]{4})\s+(\d{4})\s+(.+?)\s+(\d+(?:\.\d+)?)\s*cr/;
     const descriptionPattern = /\d+\s*cr\s+(.+?)(?=PREREQ:|COREQ:|MUTEXCL:|ATTR:|NOTE:|$)/s;
     const prerequisitePattern = /PREREQ:\s*(.+?)(?=COREQ:|MUTEXCL:|ATTR:|NOTE:|$)/;
     const corequisitePattern = /COREQ:\s*(.+?)(?=PREREQ:|MUTEXCL:|ATTR:|NOTE:|$)/;
     const mutuallyExclusivePattern = /MUTEXCL:\s*(.+?)(?=ATTR:|NOTE:|$)/;
     const attributesPattern = /ATTR:\s*(.+?)$/;
     const notePattern = /NOTE:\s*(.+?)(?=PREREQ:|COREQ:|MUTEXCL:|ATTR:|$)/;
-  
+    const equivToPattern = /EQUIV:\s*(.+?)(?=PREREQ:|COREQ:|MUTEXCL:|ATTR:|NOTE:|$)/;
+
     const codeAndTitleMatch = cleanedText.match(codeAndTitlePattern);
     const descriptionMatch = cleanedText.match(descriptionPattern);
     const prerequisiteMatch = cleanedText.match(prerequisitePattern);
     const corequisiteMatch = cleanedText.match(corequisitePattern);
     const mutuallyExclusiveMatch = cleanedText.match(mutuallyExclusivePattern);
     const attributesMatch = cleanedText.match(attributesPattern);
+    const equivToMatch = cleanedText.match(equivToPattern);
     const noteMatch = cleanedText.match(notePattern);
   
     const department = codeAndTitleMatch ? codeAndTitleMatch[1] : "";
@@ -118,19 +125,26 @@ function extractCourseInfo(courseText) {
       credits: codeAndTitleMatch ? parseInt(codeAndTitleMatch[4]) : 0,
       description: descriptionMatch ? descriptionMatch[1].trim() : "",
       requirements: {
-        prerequisite: extractCourseIDs(prerequisiteMatch ? prerequisiteMatch[1] : ""),
-        corequisite: extractCourseIDs(corequisiteMatch ? corequisiteMatch[1] : ""),
-        mutuallyExclusive: extractCourseIDs(mutuallyExclusiveMatch ? mutuallyExclusiveMatch[1] : ""),
+        prerequisite: prerequisiteMatch ? prerequisiteMatch[1] : "",
+        corequisite: corequisiteMatch ? corequisiteMatch[1] : "",
+        mutuallyExclusive: mutuallyExclusiveMatch ? mutuallyExclusiveMatch[1] : "",
+        equivTo: equivToMatch ? equivToMatch[1] : "",
         note: noteMatch ? noteMatch[1].trim() : ""
       },
       attributes: attributesMatch ? attributesMatch[1].trim() : ""
     };
 }
   
-  
-function testDATA(){
+
+//EXTRACT_COURSE_INFO() function tests
+function testEmptyIDs(){
     for(let i=0; i<RAW_DATA.length; i++){
         //console.log(RAW_DATA[i]);
-        console.log(JSON.stringify(COURSE_DATA[i]));
+        //console.log(COURSE_DATA[i]);
+        //console.log(JSON.stringify(COURSE_DATA[i]));
+        if (COURSE_DATA[i].id === ''){
+            console.log(COURSE_DATA[i]);
+            console.log(RAW_DATA[i]);
+        }
     }
 }
