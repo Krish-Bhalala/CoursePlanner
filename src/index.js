@@ -2,7 +2,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const courseHtmlIdentifier = ".courseblock";
 
-let COURSE_DATA = [];
+let COURSE_DATA = {};
 let RAW_DATA = [];
 
 /*
@@ -51,7 +51,7 @@ async function scrapeCourseData(){
       const rawData = $(element).text();
       const cleanData = cleanCourseText(rawData);
       const structuredData = extractCourseInfo(rawData);
-      COURSE_DATA.push(structuredData) 
+      COURSE_DATA[structuredData.id]=structuredData;
       RAW_DATA.push(cleanData);
     });
     //testEmptyIDs();
@@ -59,7 +59,7 @@ async function scrapeCourseData(){
   .catch((error) => {
     console.log(error);
   });
-
+  
   return COURSE_DATA;
 }
 
@@ -85,6 +85,10 @@ function cleanCourseText(text) {
     });
   
     return cleanedText;
+}
+
+function refactorRequirements(){
+  
 }
 
 function extractCourseInfo(courseText) {
@@ -134,7 +138,7 @@ function extractCourseInfo(courseText) {
       attributes: attributesMatch ? attributesMatch[1].trim() : ""
     };
 }
-  
+
 
 //EXTRACT_COURSE_INFO() function tests
 function testEmptyIDs(){
@@ -148,3 +152,86 @@ function testEmptyIDs(){
         }
     }
 }
+
+async function main(){
+  await scrapeCourseData();
+  setTimeout(()=>console.log(COURSE_DATA["COMP3010"]),1000);
+}
+//main();
+
+
+function parsePrerequisites(text) {
+  // Remove unnecessary characters and split into main sections
+  const sections = text.replace(/[\[\]]/g, '').split(/\s*and\s*/);
+
+  function parseSection(section) {
+    if (section.includes('or')) {
+      const parts = section.split(/\s*or\s*/);
+      return {
+        "ONE_OF": parts.map(part => parseSection(part.trim()))
+      };
+    } else if (section.includes('and')) {
+      const parts = section.split(/\s*and\s*/);
+      return {
+        "AND": parts.map(part => parseSection(part.trim()))
+      };
+    } else if (section.includes('credit hours')) {
+      const match = section.match(/(\d+)\s*credit hours of ([A-Z]{4}) courses at the (\d+)/);
+      if (match) {
+        return { [`${match[2]}${match[3]}XX`]: parseInt(match[1]) };
+      }
+    } else {
+      // Remove grade requirements and spaces from course codes
+      return section.replace(/\s*\([A-Z]\)\s*/g, '').replace(/\s+/g, '');
+    }
+  }
+
+  const prerequisites = sections.map(section => parseSection(section.trim()));
+
+  return { prerequisites };
+}
+
+// Example usage
+const text = "[(COMP 2150 or ECE 3740) or ((COMP 2140 or the former COMP 2061) and 3 credit hours of MATH courses at the 2000 level)] and [one of MATH 1220, MATH 1300 (B), MATH 1301 (B), MATH 1310 (B), MATH 1210 (B), or MATH 1211 (B)] and [one of MATH 1230, MATH 1500 (B), MATH 1501 (B), MATH 1510 (B), the former MATH 1520 (B), or MATH 1524 (B)]";
+const testText = "[[COMP 2150 and COMP 2080] or [ECE 3740 and ECE 3790]] and [one of STAT 1150, STAT 1000, STAT 1001, STAT 2220, or PHYS 2496].";
+requirementParser(text);
+// const result = parsePrerequisites(text);
+// console.log(JSON.stringify(result, null, 2));
+
+function removeEndBrackets(text){
+  const openingBracket = new Set(["[","{","("]);
+  const closingBracket = new Set(["]","}",")"]);
+  let openingCleaned = false;
+  let closingCleaned = false;
+  let start = 0;
+  let end = text.length-1;
+  while (!openingCleaned || !closingCleaned){
+    if(!openingCleaned){
+      if(openingBracket.has(text[start])){
+        openingCleaned = true
+      }else{
+        start++;
+      }
+    }
+    if(!closingCleaned){
+      if(closingBracket.has(text[end])){
+        closingCleaned = true
+      }else{
+        end--;
+      }
+    }
+  }
+
+  return text.substring(start+1, end);
+}
+
+function requirementParser(input){
+  const parts = input.split(/\s+and\s+(?![^\[]*\])/);
+  parts.map((element) => {
+    element
+  });
+  //console.log(parts);
+}
+
+const ans = removeEndBrackets("[(COMP 2150 or ECE 3740) or ((COMP 2140 or the former COMP 2061) and 3 credit hours of MATH courses at the 2000 level)].");
+console.log(ans);
