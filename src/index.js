@@ -266,6 +266,7 @@ function requirementParser(input) {
 }
 
 
+//split a string by all the indices mentioned by the list
 //assume: indices is in ascending order
 function splitStringByIndices(str,indices){
   const strLen = str.length;
@@ -279,14 +280,13 @@ function splitStringByIndices(str,indices){
       //add 0 at first
       indices.unshift(0);
     }
-    if(indices[indices.length-1]<strLen && indices[indices.length-1] !== strLen-1){
-      indices.push(strLen-1);
+    if(indices[indices.length-1]<= strLen && indices[indices.length-1] !== strLen){
+      indices.push(strLen);
     }
   }else{
     return [str];
   }
-
-  //start spliting the str
+  //start splitting the str
   for(let i=0; i<indices.length-1; i++){
     result.push(str.slice(indices[i],indices[i+1]));
   }
@@ -294,39 +294,48 @@ function splitStringByIndices(str,indices){
   return result;
 }
 
+
+//take a text and group/break it based on their outerMost bracket
 function groupBrackets(str){
   const bracketPairs = {"{":"}","[":"]","(":")"};
   const openingBracket = new Set(["[", "{", "("]);
   const closingBracket = new Set(["]", "}", ")"]);
-  let openBrackets = [];
-  let breakingIndices = [];
-  let notMarked = true; //flag to not split a word that is not enclosed by brackets char by char
+  const addBreakpoint = (idx) => breakingIndices.push(idx);
+  let openBrackets = [];    //stack for bracket matching  
+  let breakingIndices = []; //keeps track of all the breakpoints needed for the string
 
+
+  //loop through each char in string
   for(let i=0; i<str.length; i++){
-    //console.log(`${i} : ${openBrackets}`);
     const char = str[i];
 
+    //keep track of open and closed brackets
     if(openingBracket.has(char)){
-      // if new bracket is opened then add it to the stack and toggle hasSplit
-      notMarked = true;         //signifies a new bracket is opened so do not mark an index to split unless it is closed
+      //add a breakpoint for starting of the first mismatch bracket of the openBrackets
+      if(openBrackets.length === 0 && i>0){
+        addBreakpoint(i-1);
+      }
+      //update the bracket matching stack
       openBrackets.push(char);
     }else if(closingBracket.has(char)){
-      // if its a closing bracket check if it closes any previous bracket
+      //close the last open bracket if the current closing bracket matches it
       const lastOpenBracket = openBrackets[openBrackets.length-1];
       if(bracketPairs[lastOpenBracket] === char){
-        //it closes the last bracket so pop it
         openBrackets.pop();
       }
-    }
-
-    if(openBrackets.length == 0 && i < str.length-1 && notMarked){
-      breakingIndices.push(i+1);
-      notMarked = false;
+      //add breakpoint after one bracket group ends (i.e. when all previous brackets matches) 
+      if(openBrackets.length == 0 && i < str.length){
+        addBreakpoint(i+1);
+      }
     }
   }
 
-  //return breakingIndices;
-  return splitStringByIndices(str,breakingIndices);
+  //return only if brackets are matched properly
+  if(openBrackets.length !== 0){
+    return [];
+  }else{
+    return splitStringByIndices(str,breakingIndices);
+  }
 }
 
 
@@ -340,6 +349,7 @@ function basicTests(){
   // Example usage
   const text = "[(COMP 2150 or ECE 3740) or ((COMP 2140 or the former COMP 2061) and 3 credit hours of MATH courses at the 2000 level)] and [one of MATH 1220, MATH 1300 (B), MATH 1301 (B), MATH 1310 (B), MATH 1210 (B), or MATH 1211 (B)] and [one of MATH 1230, MATH 1500 (B), MATH 1501 (B), MATH 1510 (B), the former MATH 1520 (B), or MATH 1524 (B)]";
   const testText = "[[COMP 2150 and COMP 2080] or [ECE 3740 and ECE 3790]] and [one of STAT 1150, STAT 1000, STAT 1001, STAT 2220, or PHYS 2496].";
+  const text2 = "COMP 2150 or ECE 3740 or ((COMP 2140 or the former COMP 2061) and 3 credit hours of MATH courses at the 2000 level) and [one of MATH 1220, MATH 1300 (B), MATH 1301 (B), MATH 1310 (B), MATH 1210 (B), or MATH 1211 (B)] and [one of MATH 1230, MATH 1500 (B), MATH 1501 (B), MATH 1510 (B), the former MATH 1520 (B), or MATH 1524 (B)]";
   // console.log(JSON.stringify(requirementParser(testText),null,2));
   //const result = requirementParser(text);
   //console.log(JSON.stringify(result, null, 2));
