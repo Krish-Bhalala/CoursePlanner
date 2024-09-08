@@ -7,6 +7,7 @@ let RAW_DATA = [];
 
 /*
 COURSE OBJECT SCHEMA
+
     {
       "id": "COMP4820",
       "department": "COMP",
@@ -110,6 +111,8 @@ function extractCourseInfo(courseText) {
   
     const department = codeAndTitleMatch ? codeAndTitleMatch[1] : "";
     const code = codeAndTitleMatch ? codeAndTitleMatch[2] : "";
+
+    console.log(groupBrackets(prerequisiteMatch ? prerequisiteMatch[1] : ""));
   
     function extractCourseIDs(text) {
       if (!text) return [];
@@ -288,7 +291,7 @@ function splitStringByIndices(str,indices){
   }
   //start splitting the str
   for(let i=0; i<indices.length-1; i++){
-    result.push(str.slice(indices[i],indices[i+1]));
+    result.push(str.slice(indices[i],indices[i+1]).trim());
   }
 
   return result;
@@ -339,6 +342,60 @@ function groupBrackets(str){
 }
 
 
+//processes requriements to simplify computation
+//breaks every text into JSON 
+//new startegy: 1) figure out the operator and group them and then further process it 
+//regex for the first word of any line /\b[a-zA-Z]+\b/im
+
+function formatRequirements(text) {
+  //Breaking condition
+  
+  //group text based on brackets
+  const groupedData = groupBrackets(text);
+  
+  //first format the AND/OR operator
+  //AND: [array]
+  //{OR: {set}}
+  if(groupedData.length >= 3){
+    //there is a operator at every odd index
+    let operator = [];
+    let operands = [];
+    const isOperator =/^.?(and|or|one.?of).?$/gmi
+    groupedData.forEach(element => {
+      if(isOperator.test(element)){
+        operator.push(element);
+      }else{
+        operands.push(element);
+      }
+    });
+    
+  }
+
+
+  //remove outer brackets in resulting elements of array
+   groupedData.map(element => {
+    element = element.trim(); 
+    const checkOuterBracket = /^\(.*\)$|^\[.*\]$|^\{.*\}$/gm
+    if(checkOuterBracket.test(element)){
+      //remove outer brackets if it exists
+      element = removeOuterBrackets(element);
+    }
+
+    //group the element if needed again
+    const checkSubGroups = /\(.{6,}?\)|\{.6,}?\}|\[.{6,}?\]/gm     //looks for brackets with a course code (ie 6+ chars)
+    if(checkSubGroups.test(element)){
+      element = formatRequirements(element);
+    }
+    
+    //format the AND/OR
+  });
+  
+  //recursive call to further break the bracket
+  //convert it to json
+  
+  //return json object
+}
+
 
 //---------------------------------------------------------------------------------------------------------------------------------------
 function basicTests(){
@@ -351,8 +408,8 @@ function basicTests(){
   const testText = "[[COMP 2150 and COMP 2080] or [ECE 3740 and ECE 3790]] and [one of STAT 1150, STAT 1000, STAT 1001, STAT 2220, or PHYS 2496].";
   const text2 = "COMP 2150 or ECE 3740 or ((COMP 2140 or the former COMP 2061) and 3 credit hours of MATH courses at the 2000 level) and [one of MATH 1220, MATH 1300 (B), MATH 1301 (B), MATH 1310 (B), MATH 1210 (B), or MATH 1211 (B)] and [one of MATH 1230, MATH 1500 (B), MATH 1501 (B), MATH 1510 (B), the former MATH 1520 (B), or MATH 1524 (B)]";
   // console.log(JSON.stringify(requirementParser(testText),null,2));
-  //const result = requirementParser(text);
-  //console.log(JSON.stringify(result, null, 2));
+  const result = requirementParser(text);
+  console.log(JSON.stringify(result, null, 2));
 
   //TEST extractCourseIDs()
   const courseIdTests = ["3 credit hours of MATH courses at the 2000 level","MATH 1300 (B)","MATH 1500 )"];
@@ -369,6 +426,8 @@ async function main(){
   await scrapeCourseData();
   setTimeout(()=>console.log(COURSE_DATA["COMP3010"]),1000);
 }
-//main();
+main();
 
 basicTests();
+
+
